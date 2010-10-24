@@ -6,11 +6,11 @@
   (digest-string [this str]))
 
 (defprotocol DigestAlgorithm
-  (digest-update! [this])
+  (digest-update! [this data])
   (digest-final! [this]))
 
 (defn default-digest-string [algorithm-meta str]
-  (with-in-str str (make-algorithm algorithm-meta)))
+  (with-in-str str (digest algorithm-meta)))
 
 (defn digest-hexify [str]
   (with-out-str
