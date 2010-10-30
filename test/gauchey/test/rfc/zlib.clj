@@ -1,8 +1,7 @@
 (ns gauchey.test.rfc.zlib
   (:use gauchey.rfc.zlib
-	clojure.test
-	[clojure.contrib.io :only (with-out-writer)])
-  (:import java.io.ByteArrayOutputStream
+	clojure.test)
+  (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
 	   [java.util.zip DeflaterOutputStream
 	                  InflaterInputStream
 	                  GZIPOutputStream
@@ -10,8 +9,7 @@
 
 (defn compress-by [os-maker]
   (let [baos (ByteArrayOutputStream.)]
-    (with-out-writer (os-maker baos)
-      (print "hoge"))
+    (spit (os-maker baos) "hoge")
     (.toByteArray baos)))
 
 (def compressed-by-deflate
@@ -26,3 +24,13 @@
 (deftest test-open-deflating-port
   (is (bytes= (compress-by open-deflating-port)
 	      compressed-by-deflate)))
+
+(defn decompress-by [is-maker data]
+  (let [bais (ByteArrayInputStream. data)]
+    (.getBytes (slurp (is-maker bais)))))
+
+(deftest test-open-inflating-port
+  (is (bytes= (decompress-by #(open-inflating-port %)
+			     compressed-by-deflate)
+	      (decompress-by #(InflaterInputStream. %)
+			     compressed-by-deflate))))

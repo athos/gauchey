@@ -30,7 +30,17 @@
 (gen-class
   :name gauchey.rfc.zlib.InflatingInputStream
   :extends java.util.zip.InflaterInputStream
-  :implements [gauchey.rfc.zlib.XflatingStream])
+  :implements [gauchey.rfc.zlib.XflatingStream]
+  :init init-inflating
+  :state state
+  :constructors {[java.io.InputStream int "[B" boolean]
+		 [java.io.InputStream java.util.zip.Inflater int]})
+
+(defn -init-inflating [in size dict owner?]
+  (let [inflater (Inflater.)]
+    (when dict
+      (.setDictionary inflater dict))
+    [[in inflater size] {:inflater inflater, :owner? owner?}]))
 
 (import '[gauchey.rfc.zlib XflatingStream DeflatingOutputStream InflatingInputStream])
 
@@ -71,8 +81,15 @@
     (throw (UnsupportedOperationException.)))
   (DeflatingOutputStream. drain compression-level buffer-size strategy dictionary owner?))
 
-(defn open-inflating-port [source]
-  nil)
+(defnk open-inflating-port [source
+			    :buffer-size 4096
+			    :window-bits nil
+			    :dictionary nil
+			    :ower? false]
+  (when window-bits
+    (throw (UnsupportedOperationException.)))
+  (InflatingInputStream. source buffer-size dictionary ower?))
+
 
 ;; xflating port methods
 (defn -getTotalIn [this]
