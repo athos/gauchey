@@ -5,7 +5,8 @@
 	   [java.util.zip DeflaterOutputStream
 	                  InflaterInputStream
 	                  GZIPOutputStream
-	                  GZIPInputStream]))
+	                  GZIPInputStream
+	                  CRC32 Adler32]))
 
 (defn compress-by [os-maker]
   (let [baos (ByteArrayOutputStream.)]
@@ -34,3 +35,23 @@
 			     compressed-by-deflate)
 	      (decompress-by #(InflaterInputStream. %)
 			     compressed-by-deflate))))
+
+(deftest test-deflate-string
+  (is (bytes= (deflate-string "hoge")
+	      compressed-by-deflate)))
+
+(deftest test-inflate-string
+  (is (bytes= (inflate-string compressed-by-deflate)
+	      (.getBytes "hoge"))))
+
+(deftest test-crc32
+  (is (crc32 "hoge")
+      (doto (CRC32.)
+	(.update (.getBytes "hoge"))
+	(.getValue))))
+
+(deftest test-adler32
+  (is (adler32 "hoge")
+      (doto (Adler32.)
+	(.update (.getBytes "hoge"))
+	(.getValue))))

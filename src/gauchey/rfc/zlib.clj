@@ -1,8 +1,10 @@
 (ns gauchey.rfc.zlib
   (:use [clojure.contrib.def :only (defnk)])
-  (:import [java.util.zip Deflater Inflater
+  (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
+	   [java.util.zip Deflater Inflater
 	    DeflaterOutputStream InflaterInputStream
-	    GZIPOutputStream GZIPInputStream]))
+	    GZIPOutputStream GZIPInputStream
+	    CRC32 Adler32]))
 
 (gen-interface
   :name gauchey.rfc.zlib.XflatingStream
@@ -116,26 +118,42 @@
 (defn zstream-data-type [^XflatingStream xflating-port]
   (.getDataType xflating-port))
 
-(defn zstream-params-set! [deflating-port]
-  nil)
+(defnk zstream-params-set! [deflating-port
+			   :compression-level nil
+			   :strategy nil]
+  (when compression-level
+    (.setLevel deflating-port compression-level))
+  (when strategy
+    (.setStrategy deflating-port strategy)))
 
 (defn zstream-dictionary-adler32 [deflating-port]
-  nil)
+  (throw (UnsupportedOperationException.)))
 
 (defn deflating-port-full-flush [deflating-port]
-  nil)
+  (throw (UnsupportedOperationException.)))
 
 (defn inflate-sync [inflating-port]
-  nil)
+  (throw (UnsupportedOperationException.)))
+
+
+;; miscellaneous API
+(defn- bytes* [bs]
+  (if (string? bs) (.getBytes bs) bs))
 
 (defn zlib-version []
   nil)
 
-(defn deflate-string [string]
-  nil)
+(defn deflate-string [string & options]
+  (let [baos (ByteArrayOutputStream.)
+	p (apply open-deflating-port baos options)]
+    (.write p (bytes* string))
+    (.close p)
+    (.toByteArray baos)))
 
-(defn inflate-string [string]
-  nil)
+(defn inflate-string [string & options]
+  (let [data (bytes* string)
+	p (apply open-inflating-port (ByteArrayInputStream. data) options)]
+    (.getBytes (slurp p))))
 
 (defn gzip-encode-string [string]
   nil)
@@ -144,7 +162,11 @@
   nil)
 
 (defn crc32 [string]
-  nil)
+  (doto (CRC32.)
+    (.update (bytes* string))
+    (.getValue)))
 
-(defn alder32 [string]
-  nil)
+(defn adler32 [string]
+  (doto (Adler32.)
+    (.update (bytes* string))
+    (.getValue)))
