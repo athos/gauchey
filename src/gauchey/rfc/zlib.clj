@@ -1,10 +1,7 @@
 (ns gauchey.rfc.zlib
   (:use [clojure.contrib.def :only (defnk)])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
-	   [java.util.zip Deflater Inflater
-	    DeflaterOutputStream InflaterInputStream
-	    GZIPOutputStream GZIPInputStream
-	    CRC32 Adler32]))
+	   [java.util.zip Deflater Inflater CRC32 Adler32]))
 
 (gen-interface
   :name gauchey.rfc.zlib.XflatingStream
@@ -19,15 +16,11 @@
   :implements [gauchey.rfc.zlib.XflatingStream]
   :init init-deflating
   :exposes {def {:get getXflater, :set setXflater}}
-  :constructors {[java.io.OutputStream int int int "[B" boolean]
+  :constructors {[java.io.OutputStream java.util.zip.Deflater int boolean]
 		 [java.io.OutputStream java.util.zip.Deflater int]})
 
-(defn -init-deflating [out clevel size strategy dict owner?]
-  (let [deflater (Deflater. clevel)]
-    (.setStrategy deflater strategy)
-    (when dict
-      (.setDictionary deflater dict))
-    [[out deflater size] {:owner? owner?}]))
+(defn -init-deflating [out deflater size owner?]
+  [[out deflater size] {:owner? owner?}])
 
 (gen-class
   :name gauchey.rfc.zlib.InflatingInputStream
@@ -35,16 +28,39 @@
   :implements [gauchey.rfc.zlib.XflatingStream]
   :init init-inflating
   :exposes {inf {:get getXflater, :set setXflater}}
-  :constructors {[java.io.InputStream int "[B" boolean]
+  :constructors {[java.io.InputStream java.util.zip.Inflater int boolean]
 		 [java.io.InputStream java.util.zip.Inflater int]})
 
-(defn -init-inflating [in size dict owner?]
-  (let [inflater (Inflater.)]
-    (when dict
-      (.setDictionary inflater dict))
-    [[in inflater size] {:owner? owner?}]))
+(defn -init-inflating [in inflater size owner?]
+  [[in inflater size] {:owner? owner?}])
 
-(import '[gauchey.rfc.zlib XflatingStream DeflatingOutputStream InflatingInputStream])
+(gen-class
+  :name gauchey.rfc.zlib.GZIPOutputStream
+  :extends java.util.zip.GZIPOutputStream
+  :implements [gauchey.rfc.zlib.XflatingStream]
+  :init init-gzip-output
+  :exposes {def {:get getXflater, :set setXflater}}
+  :constructors {[java.io.OutputStream int boolean]
+		 [java.io.OutputStream int]})
+
+(defn -init-gzip-output [out size owner?]
+  [[out size] {:owner? owner?}])
+
+(gen-class
+  :name gauchey.rfc.zlib.GZIPInputStream
+  :extends java.util.zip.GZIPInputStream
+  :implements [gauchey.rfc.zlib.XflatingStream]
+  :init init-gzip-input
+  :exposes {inf {:get getXflater, :set setXflater}}
+  :constructors {[java.io.InputStream int boolean]
+		 [java.io.InputStream int]})
+
+(defn -init-gzip-input [in size owner?]
+  [[in size] {:owner? owner?}])
+
+(import '[gauchey.rfc.zlib XflatingStream
+	                   DeflatingOutputStream InflatingInputStream
+	                   GZIPOutputStream GZIPInputStream])
 
 ;; (defn -close [this]
 ;;   (if (:owner? (.state this))
@@ -71,27 +87,42 @@
 (defnk open-deflating-port [drain
 			    :compression-level Z_DEFAULT_COMPRESSION
 			    :buffer-size 4096
-			    :window-bits nil
+			    :window-bits 15
 			    :memory-level nil
 			    :strategy Z_DEFAULT_STRATEGY
 			    :dictionary nil
 			    :owner? false]
-  (when (or window-bits
-	    memory-level
+  (when (or memory-level
 	    (= compression-level Z_RLE)
 	    (= compression-level Z_FIXED))
     (throw (UnsupportedOperationException.)))
-  (DeflatingOutputStream. drain compression-level buffer-size strategy dictionary owner?))
+  (let [os (cond (<= 8 window-bits 15)
+		 (let [deflater (Deflater. compression-level)]
+		   (DeflatingOutputStream. drain deflater buffer-size owner?))
+		 (<= 24 window-bits 31)
+		 (GZIPOutputStream. drain buffer-size owner?)
+		 :else (throw (UnsupportedOperationException.)))
+	deflater (.getXflater os)]
+    (.setStrategy deflater strategy)
+    (when dictionary
+      (.setDictionary deflater dictionary))
+    os))
 
 (defnk open-inflating-port [source
 			    :buffer-size 4096
-			    :window-bits nil
+			    :window-bits 15
 			    :dictionary nil
-			    :ower? false]
-  (when window-bits
-    (throw (UnsupportedOperationException.)))
-  (InflatingInputStream. source buffer-size dictionary ower?))
-
+			    :owner? false]
+  (let [is (cond (<= 8 window-bits 15)
+		 (let [inflater (Inflater.)]
+		   (InflatingInputStream. source inflater buffer-size owner?))
+		 (<= 24 window-bits 31)
+		 (GZIPInputStream. source buffer-size owner?)
+		 :else (throw (UnsupportedOperationException.)))
+	inflater (.getXflater is)]
+    (when dictionary
+      (.setDictionary inflater dictionary))
+    is))
 
 ;; xflating port methods
 (defn -getTotalIn [this]
@@ -155,11 +186,11 @@
 	p (apply open-inflating-port (ByteArrayInputStream. data) options)]
     (.getBytes (slurp p))))
 
-(defn gzip-encode-string [string]
-  nil)
+(defn gzip-encode-string [string & options]
+  (apply deflate-string string :window-bits (+ 15 16) options))
 
-(defn gzip-decode-string [string]
-  nil)
+(defn gzip-decode-string [string & options]
+  (apply inflate-string string :window-bits (+ 15 16) options))
 
 (defn crc32 [string]
   (doto (CRC32.)

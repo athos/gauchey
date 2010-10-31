@@ -2,10 +2,8 @@
   (:use gauchey.rfc.zlib
 	clojure.test)
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
-	   [java.util.zip DeflaterOutputStream
-	                  InflaterInputStream
-	                  GZIPOutputStream
-	                  GZIPInputStream
+	   [java.util.zip DeflaterOutputStream InflaterInputStream
+	                  GZIPOutputStream GZIPInputStream
 	                  CRC32 Adler32]))
 
 (defn compress-by [os-maker]
@@ -24,7 +22,9 @@
 
 (deftest test-open-deflating-port
   (is (bytes= (compress-by open-deflating-port)
-	      compressed-by-deflate)))
+	      compressed-by-deflate))
+  (is (bytes= (compress-by #(open-deflating-port % :window-bits 31))
+	      compressed-by-gzip)))
 
 (defn decompress-by [is-maker data]
   (let [bais (ByteArrayInputStream. data)]
@@ -34,7 +34,11 @@
   (is (bytes= (decompress-by #(open-inflating-port %)
 			     compressed-by-deflate)
 	      (decompress-by #(InflaterInputStream. %)
-			     compressed-by-deflate))))
+			     compressed-by-deflate)))
+  (is (bytes= (decompress-by #(open-inflating-port % :window-bits 31)
+			     compressed-by-gzip)
+	      (decompress-by #(GZIPInputStream. %)
+			     compressed-by-gzip))))
 
 (deftest test-deflate-string
   (is (bytes= (deflate-string "hoge")
@@ -42,6 +46,14 @@
 
 (deftest test-inflate-string
   (is (bytes= (inflate-string compressed-by-deflate)
+	      (.getBytes "hoge"))))
+
+(deftest test-gzip-encode-string
+  (is (bytes= (gzip-encode-string "hoge")
+	      compressed-by-gzip)))
+
+(deftest test-gzip-decode-string
+  (is (bytes= (gzip-decode-string compressed-by-gzip)
 	      (.getBytes "hoge"))))
 
 (deftest test-crc32
