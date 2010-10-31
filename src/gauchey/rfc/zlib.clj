@@ -18,7 +18,7 @@
   :extends java.util.zip.DeflaterOutputStream
   :implements [gauchey.rfc.zlib.XflatingStream]
   :init init-deflating
-  :state state
+  :exposes {def {:get getXflater, :set setXflater}}
   :constructors {[java.io.OutputStream int int int "[B" boolean]
 		 [java.io.OutputStream java.util.zip.Deflater int]})
 
@@ -27,14 +27,14 @@
     (.setStrategy deflater strategy)
     (when dict
       (.setDictionary deflater dict))
-    [[out deflater size] {:deflater deflater, :owner? owner?}]))
+    [[out deflater size] {:owner? owner?}]))
 
 (gen-class
   :name gauchey.rfc.zlib.InflatingInputStream
   :extends java.util.zip.InflaterInputStream
   :implements [gauchey.rfc.zlib.XflatingStream]
   :init init-inflating
-  :state state
+  :exposes {inf {:get getXflater, :set setXflater}}
   :constructors {[java.io.InputStream int "[B" boolean]
 		 [java.io.InputStream java.util.zip.Inflater int]})
 
@@ -42,7 +42,7 @@
   (let [inflater (Inflater.)]
     (when dict
       (.setDictionary inflater dict))
-    [[in inflater size] {:inflater inflater, :owner? owner?}]))
+    [[in inflater size] {:owner? owner?}]))
 
 (import '[gauchey.rfc.zlib XflatingStream DeflatingOutputStream InflatingInputStream])
 
@@ -95,19 +95,19 @@
 
 ;; xflating port methods
 (defn -getTotalIn [this]
-  (.getTotalIn (:deflater (.state this))))
+  (.getTotalIn (.getXflater this)))
 
 (defn zstream-total-in [^XflatingStream xflating-port]
   (.getTotalIn xflating-port))
 
 (defn -getTotalOut [this]
-  (.getTotalOut (:deflater (.state this))))
+  (.getTotalOut (.getXflater this)))
 
 (defn zstream-total-out [^XflatingStream xflating-port]
   (.getTotalOut xflating-port))
 
 (defn -getAdler32 [this]
-  (.getAdler (:deflater (.state this))))
+  (.getAdler (.getXflater this)))
 
 (defn zstream-adler32 [^XflatingStream xflating-port]
   (.getAdler32 xflating-port))
@@ -122,9 +122,9 @@
 			   :compression-level nil
 			   :strategy nil]
   (when compression-level
-    (.setLevel deflating-port compression-level))
+    (.setLevel (.getXflater deflating-port) compression-level))
   (when strategy
-    (.setStrategy deflating-port strategy)))
+    (.setStrategy (.getXflater deflating-port) strategy)))
 
 (defn zstream-dictionary-adler32 [deflating-port]
   (throw (UnsupportedOperationException.)))
