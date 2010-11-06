@@ -4,6 +4,7 @@
 	    second core-second,
 	    take core-take,
 	    drop core-drop,
+	    split-at core-split-at,
 	    last core-last,
 	    count core-count,
 	    reduce core-reduce,
@@ -28,8 +29,8 @@
   (for [n (range n)]
     (init-proc n)))
 
-(defn circular-list []
-  nil)
+(defn circular-list [& elts]
+  (throw (UnsupportedOperationException.)))
 
 (defn iota [count & [start step]]
   (let [start (or start 0)
@@ -37,7 +38,7 @@
     (core-take count (iterate #(+ step %) start))))
 
 (defn not-pair? [x]
-  nil)
+  (throw (UnsupportedOperationException.)))
 
 (defn list= [elt= & lists]
   (every? identity (apply map elt= lists)))
@@ -93,6 +94,9 @@
 (defn drop-right! [x i]
   nil)
 
+(defn split-at [x i]
+  (core-split-at i x))
+
 (defn split-at! [x i]
   nil)
 
@@ -100,18 +104,19 @@
   (core-last pair))
 
 (defn length+ [x]
-  nil)
+  (and (list? x)
+      (core-count x)))
 
 (defn concatenate [list-of-lists]
   (apply concat list-of-lists))
 
-(defn concatenate! []
+(defn concatenate! [list-of-lists]
   nil)
 
 (defn append-reverse [rev-head tail]
   (core-reduce #(cons %2 %1) tail rev-head))
 
-(defn append-reverse! []
+(defn append-reverse! [rev-head tail]
   nil)
 
 (defn zip [& clists]

@@ -108,7 +108,10 @@
 	 3)))
 
 (deftest test-length+
-  nil)
+  (is (= (srfi-1/length+ '(1 2 3))
+	 3))
+  (is (= (srfi-1/length+ 0)
+	 false)))
 
 (deftest test-concatenate
   (is (= (srfi-1/concatenate '((0 1) (2 3) (4 5)))
