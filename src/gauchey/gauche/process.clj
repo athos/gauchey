@@ -1,7 +1,7 @@
 (ns gauchey.gauche.process
   (:use [clojure.contrib.def :only (defnk)]
-	[clojure.contrib.io :only (with-in-reader with-out-writer)]
-	[gauchey.gauche :only (sys-pipe)]))
+	[clojure.contrib.io :only (with-in-reader with-out-writer read-lines)]
+	[clojure.string :rename {replace str-replace, reverse _reverse}]))
 
 (gen-class
   :name gauchey.gauche.process.ProcessAbnormalExitException
@@ -173,11 +173,16 @@
     (handle-abnormal-exit on-abnormal-exit p)
     ret))
 
-(defn process-output->string []
-  nil)
+(defn process-output->string [command & opts]
+  (apply call-with-input-process command
+	 #(str-replace (slurp %) #"[ ]+" " ")
+	 opts))
 
-(defn process-output->string-list []
-  nil)
+(defn process-output->string-list [command & opts]
+  (apply call-with-input-process command read-lines opts))
 
-(defn shell-escape-string []
-  nil)
+(defn shell-escape-string [s]
+  (cond (= s "") "''"
+	(re-find #"[\s\\\"'*?$<>!\[\](){}]" s)
+	(str "'" (str-replace s #"'" "'\"'\"'") "'")
+	:else s))
