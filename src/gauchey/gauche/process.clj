@@ -1,5 +1,5 @@
 (ns gauchey.gauche.process
-  (:use [clojure.contrib.def :only (defnk)]
+  (:use [gauchey :only (defn*)]
 	[clojure.contrib.io :only (with-in-reader with-out-writer read-lines)]
 	[clojure.string :rename {replace str-replace, reverse _reverse}]))
 
@@ -43,9 +43,8 @@
 	~@(and dir `("cd" ~dir ";"))
 	~@argv))))
 
-(defnk run-process [command :input nil :output nil :error nil
-		            :wait false :fork true
-		            :host nil :sigmask nil :directory nil]
+(defn* run-process [command :key (input nil) (output nil) (error nil) (wait false)
+		    (fork true) (host nil) (sigmask nil) ((:directory dir) nil)]
   (let [comm (map str command)
 	argv (if host (prepare-remote host comm directory) comm)
 	builder (java.lang.ProcessBuilder. argv)
@@ -68,21 +67,16 @@
     (catch IllegalThreadStateException e
       true)))
 
-(defn process-wait
-  ([process]
-   (process-wait process false))
-  ([process nohang?]
-   (process-wait process nohang? false))
-  ([process nohang? raise-error?]
-   (if (process-alive? process)
-     (when (not nohang?)
-       (let [ret (.waitFor (:process process))]
-	 (reset! (:status process) ret)
-	 (when raise-error? nil)
-	 true))
-     (when (nil? (process-exit-status process))
-       (reset! (:status process) (.exitValue (:process process)))
-       true))))
+(defn* process-wait [process :optional (nohang? false) (raise-error? false)]
+  (if (process-alive? process)
+    (when (not nohang?)
+      (let [ret (.waitFor (:process process))]
+	(reset! (:status process) ret)
+	(when raise-error? nil)
+	true))
+    (when (nil? (process-exit-status process))
+      (reset! (:status process) (.exitValue (:process process)))
+      true)))
 
 (defn process-wait-any
   ([]
@@ -128,16 +122,18 @@
             (when-not (process-exit-status process)
 	      (on-abnormal-exit process))))
 
-(defnk open-input-process-port [command :input nil :error nil :host nil]
+(defn* open-input-process-port [command :key (input nil) (error nil) (host nil)
+				:allow-other-keys rest]
   (let [p (apply-run-process command input :pipe error host)]
     [(process-input p) p]))
 
-(defnk open-output-process-port [command :output nil :error nil :host nil]
+(defn* open-output-process-port [command :key (output nil) (error nil) (host nil)]
   (let [p (apply-run-process command :pipe output error host)]
     [(process-output p) p]))
 
-(defnk call-with-input-process [command proc :input nil :error nil :host nil
-				:on-abnormal-exit :error]
+(defn* call-with-input-process [command proc :optional (input nil) (error nil) (host nil)
+				(on-abnormal-exit :error)
+				:allow-other-keys rest]
   (let [p (apply-run-process command input :pipe error host)
         ret (with-open [i (process-input p)]
 	      (proc i))]
@@ -145,8 +141,8 @@
     (handle-abnormal-exit on-abnormal-exit p)
     ret))
 
-(defnk call-with-output-process [command proc :output nil :error nil :host nil
-				 :on-abnormal-exit :error]
+(defn* call-with-output-process [command proc :optional (output nil) (error nil) (host nil)
+				 (on-abnormal-exit :error)]
   (let [p (apply-run-process command :pipe output error host)
 	ret (with-open [o (process-output p)]
 	      (proc o))]
@@ -164,8 +160,8 @@
 	 #(with-out-writer % (thunk))
 	 opts))
 
-(defnk call-with-process-io [command proc :error nil :host nil
-			    :on-abnormal-exit :error]
+(defn* call-with-process-io [command proc :optional (error nil) (host nil)
+			     (on-abnormal-exit :error)]
   (let [p (apply-run-process command :pipe :pipe error host)
 	ret (with-open [i (process-input p), o (process-output p)]
 	      (proc i o))]
